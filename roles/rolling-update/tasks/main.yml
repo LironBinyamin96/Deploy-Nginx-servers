@@ -1,33 +1,58 @@
 ---
-- name: Get target health info from ELB Target Group
-  community.aws.elb_target_group_info:
-    target_group_arns:
-      - "{{ target_group_arn }}"
-    region: "{{ aws_region }}"
-    collect_targets_health: yes
-  register: target_info
+- name: Get instances from target group
+  shell: |
+    aws elbv2 describe-target-health \
+      --region {{ aws_region }} \
+      --target-group-arn {{ target_group_arn }} \
+      --query "TargetHealthDescriptions[?TargetHealth.State=='healthy'].Target.Id" \
+      --output text
+  register: target_instances_result
 
-- name: Debug ELB Target Group Data
-  debug:
-    var: target_info
-
-- name: Extract only healthy instance IDs
+- name: Convert space-separated instance IDs to list
   set_fact:
-    target_instances: >-
+    all_target_instances: "{{ target_instances_result.stdout.split() }}"
+
+- name: Debug Target Group Instance IDs
+  debug:
+    var: all_target_instances
+
+- name: Get running status of target instances
+  community.aws.ec2_instance_info:
+    region: "{{ aws_region }}"
+    instance_ids: "{{ all_target_instances }}"
+  register: ec2_info
+
+- name: Extract only running instance IDs
+  set_fact:
+    running_instances: >-
       {{
-        target_info.target_groups[0].targets_health_descriptions
-        | selectattr('TargetHealth.State','equalto','healthy')
-        | map(attribute='Target.Id')
+        ec2_info.instances
+        | selectattr('state.name', 'equalto', 'running')
+        | map(attribute='instance_id')
         | list
       }}
 
-- name: Split servers into two batches
+- name: Debug Running Instance IDs
+  debug:
+    var: running_instances
+
+- name: Split servers into two batches dynamically
   set_fact:
-    group1: "{{ target_instances[0::2] }}"
-    group2: "{{ target_instances[1::2] }}"
+    group1: "{{ running_instances[0::2] }}"
+    group2: "{{ running_instances[1::2] }}"
+
+- name: Debug groups
+  debug:
+    msg: "Group 1: {{ group1 }}, Group 2: {{ group2 }}"
+
+- name: Set fact for completion status
+  set_fact:
+    all_healthy: true
 
 - name: Rolling update group 1
   include_tasks: roles/nginx/tasks/main.yml
+  vars:
+    current_instance: "{{ item }}"
   loop: "{{ group1 }}"
   loop_control:
     loop_var: target_host
@@ -51,13 +76,26 @@
     exit 1
   loop: "{{ group1 }}"
   register: health_results_group1
-  failed_when: health_results_group1.results | selectattr('rc', 'ne', 0) | list | length > 0
+
+- name: Check if any instance in group 1 failed health check
+  set_fact:
+    all_healthy: false
+  loop: "{{ health_results_group1.results }}"
+  when: item.rc != 0
+  
+- name: Fail if any instance in group 1 is unhealthy
+  fail:
+    msg: "One or more instances in group 1 failed health checks. Cannot proceed with group 2 updates."
+  when: not all_healthy
 
 - name: Rolling update group 2
   include_tasks: roles/nginx/tasks/main.yml
+  vars:
+    current_instance: "{{ item }}"
   loop: "{{ group2 }}"
   loop_control:
     loop_var: target_host
+  when: all_healthy
 
 - name: Wait for group 2 instances to be healthy
   shell: |
@@ -78,4 +116,19 @@
     exit 1
   loop: "{{ group2 }}"
   register: health_results_group2
-  failed_when: health_results_group2.results | selectattr('rc', 'ne', 0) | list | length > 0
+  when: all_healthy
+
+- name: Reset health status for group 2
+  set_fact:
+    all_healthy: true
+  when: all_healthy
+
+- name: Check if any instance in group 2 failed health check
+  set_fact:
+    all_healthy: false
+  loop: "{{ health_results_group2.results }}"
+  when: item.rc is defined and item.rc != 0
+  
+- name: Report completion status
+  debug:
+    msg: "{{ 'All instances updated successfully and are healthy.' if all_healthy else 'Group 2 updates completed but some instances may not be healthy.' }}"

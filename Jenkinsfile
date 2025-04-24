@@ -24,6 +24,13 @@ pipeline {
                             chmod 600 ~/.ssh_temp/ssh_key.pem
                         '''
                     }
+
+                    // Dynamically get the EC2 instance IP using AWS CLI
+                    sh """
+                        EC2_IP=$(aws ec2 describe-instances --region {{ aws_region }} --query "Reservations[*].Instances[*].PublicIpAddress" --output text)
+                        echo "EC2 IP: $EC2_IP"
+                    """
+                    
                     
                     echo "Private Key retrieved and stored securely"
                     
@@ -34,6 +41,8 @@ pipeline {
                 }
             }
         }
+
+        
         
         stage('Install Ansible') {
             steps {
