@@ -35,7 +35,7 @@ pipeline {
             }
         }
         
-       stage('Install Ansible') {
+        stage('Install Ansible') {
             steps {
                 // Install ansible on Jenkins agent if not already installed
                 sh '''
@@ -43,6 +43,15 @@ pipeline {
                         sudo apt-get update
                         sudo apt-get install -y ansible
                     fi
+                '''
+            }
+        }
+
+        stage('Install Ansible AWS Collection') {
+            steps {
+                sh '''
+                    echo "Installing amazon.aws collection..."
+                    ansible-galaxy collection install amazon.aws
                 '''
             }
         }
