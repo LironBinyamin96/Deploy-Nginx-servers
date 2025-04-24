@@ -1,0 +1,39 @@
+---
+# tasks file for nginx
+
+- name: Install Nginx
+  apt:
+    name: nginx
+    state: latest
+    update_cache: yes
+
+- name: Get Nginx port from local Consul
+  uri:
+    url: "http://consul:8500/v1/kv/port-Nginx?raw"
+    return_content: yes
+  register: nginx_port_response
+  delegate_to: localhost
+  become: false
+
+- name: Set Nginx port fact
+  set_fact:
+    nginx_port: "{{ nginx_port_response.content }}"
+
+- name: Show which port will be used for Nginx
+  debug:
+    msg: "Nginx will run on port {{ nginx_port }}"
+
+- name: Deploy nginx.conf rendered with the selected port
+  template:
+    src: templates/nginx.conf.j2
+    dest: /etc/nginx/sites-available/default
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart Nginx
+
+- name: Deploy custom HTML page
+  copy:
+    src: files/index.html 
+    dest: /var/www/html/index.html
+  notify: Restart Nginx

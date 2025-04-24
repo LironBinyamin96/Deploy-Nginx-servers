@@ -1,0 +1,7 @@
+---
+- name: Install and configure nginx with port from Consul
+  hosts: webserver
+  become: yes
+
+  roles:
+    - role: nginx
