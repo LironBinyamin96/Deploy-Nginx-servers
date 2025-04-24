@@ -1,10 +1,19 @@
 ---
 #tasks file for nginx
+- name: Get target health info from ELB Target Group
+  amazon.aws.elb_target_facts:
+    target_group_arn: "{{ target_group_arn }}"
+    region: "{{ aws_region }}"
+  register: target_info
+
+- name: Set list of instance IDs
+  set_fact:
+    target_instances: "{{ target_info.target_health_descriptions | map(attribute='Target.Id') | list }}"
 
 - name: Split servers into two batches
   set_fact:
-    group1: "{{ ansible_play_hosts_all[0::2] }}"
-    group2: "{{ ansible_play_hosts_all[1::2] }}"
+    group1: "{{ target_instances[0::2] }}"
+    group2: "{{ target_instances[1::2] }}"
 
 - name: Rolling update group 1
   include_tasks: roles/nginx/tasks/main.yml
@@ -12,19 +21,26 @@
   loop_control:
     loop_var: target_host
 
-- name: Check health for group 1
-  uri:
-    url: "http://{{ hostvars[item].ansible_host }}:{{ nginx_port }}/health"
-    method: GET
-    status_code: 200
+- name: Wait for group 1 instances to be healthy
+  shell: |
+    for i in {1..10}; do
+      STATUS=$(aws elbv2 describe-target-health \
+        --region {{ aws_region }} \
+        --target-group-arn {{ target_group_arn }} \
+        --query "TargetHealthDescriptions[?Target.Id=='{{ item }}'].TargetHealth.State" \
+        --output text)
+      echo "Health status: $STATUS"
+      if [ "$STATUS" = "healthy" ]; then
+        echo "Instance {{ item }} is healthy!"
+        exit 0
+      fi
+      sleep 10
+    done
+    echo "Timeout waiting for instance {{ item }}"
+    exit 1
   loop: "{{ group1 }}"
   register: health_results_group1
-
-- name: Fail if any group 1 server is unhealthy
-  fail:
-    msg: "Server {{ item.item }} failed health check."
-  when: item.status != 200
-  loop: "{{ health_results_group1.results }}"
+  failed_when: health_results_group1.results | selectattr('rc', 'ne', 0) | list | length > 0
 
 - name: Rolling update group 2
   include_tasks: roles/nginx/tasks/main.yml
@@ -32,16 +48,23 @@
   loop_control:
     loop_var: target_host
 
-- name: Check health for group 2
-  uri:
-    url: "http://{{ hostvars[item].ansible_host }}:{{ nginx_port }}/health"
-    method: GET
-    status_code: 200
+- name: Wait for group 2 instances to be healthy
+  shell: |
+    for i in {1..10}; do
+      STATUS=$(aws elbv2 describe-target-health \
+        --region {{ aws_region }} \
+        --target-group-arn {{ target_group_arn }} \
+        --query "TargetHealthDescriptions[?Target.Id=='{{ item }}'].TargetHealth.State" \
+        --output text)
+      echo "Health status: $STATUS"
+      if [ "$STATUS" = "healthy" ]; then
+        echo "Instance {{ item }} is healthy!"
+        exit 0
+      fi
+      sleep 10
+    done
+    echo "Timeout waiting for instance {{ item }}"
+    exit 1
   loop: "{{ group2 }}"
   register: health_results_group2
-
-- name: Fail if any group 2 server is unhealthy
-  fail:
-    msg: "Server {{ item.item }} failed health check."
-  when: item.status != 200
-  loop: "{{ health_results_group2.results }}"
+  failed_when: health_results_group2.results | selectattr('rc', 'ne', 0) | list | length > 0
