@@ -1,14 +1,19 @@
 ---
 #tasks file for nginx
 - name: Get target health info from ELB Target Group
-  community.aws.elb_target_info:
+  community.aws.elb_target_group_info:
     target_group_arn: "{{ target_group_arn }}"
     region: "{{ aws_region }}"
   register: target_info
 
-- name: Set list of instance IDs
+- name: Set list of healthy instance IDs
   set_fact:
-    target_instances: "{{ target_info.target_health_descriptions | map(attribute='Target.Id') | list }}"
+    target_instances: >-
+      {{
+        target_info.target_group_health_descriptions
+        | selectattr('TargetHealth.State','equalto','healthy')
+        | map(attribute='Target.Id') | list
+      }}
 
 - name: Split servers into two batches
   set_fact:
