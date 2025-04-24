@@ -50,8 +50,10 @@ pipeline {
         stage('Install Ansible AWS Collection') {
             steps {
                 sh '''
-                    echo "Installing amazon.aws collection..."
+                    echo "Installing amazon.aws and community.aws collection..."
                     ansible-galaxy collection install amazon.aws
+                    ansible-galaxy collection install community.aws
+
                 '''
             }
         }

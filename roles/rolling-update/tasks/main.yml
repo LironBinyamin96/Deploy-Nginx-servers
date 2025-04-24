@@ -1,7 +1,7 @@
 ---
 #tasks file for nginx
 - name: Get target health info from ELB Target Group
-  amazon.aws.elb_target_facts:
+  community.aws.elb_target_info:
     target_group_arn: "{{ target_group_arn }}"
     region: "{{ aws_region }}"
   register: target_info
