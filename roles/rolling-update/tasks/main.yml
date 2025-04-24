@@ -7,11 +7,15 @@
     collect_targets_health: yes
   register: target_info
 
+- name: Debug ELB Target Group Data
+  debug:
+    var: target_info
+
 - name: Extract only healthy instance IDs
   set_fact:
     target_instances: >-
       {{
-        target_info.target_group_info[0].target_health_descriptions
+        target_info.target_groups[0].target_health_descriptions
         | selectattr('TargetHealth.State','equalto','healthy')
         | map(attribute='Target.Id')
         | list
