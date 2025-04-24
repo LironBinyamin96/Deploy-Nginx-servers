@@ -1,5 +1,5 @@
 ---
-# tasks file for nginx
+#tasks file for nginx
 
 - name: Install Nginx
   apt:
@@ -32,8 +32,47 @@
     mode: '0644'
   notify: Restart Nginx
 
-- name: Deploy custom HTML page
-  copy:
-    src: files/index.html 
-    dest: /var/www/html/index.html
-  notify: Restart Nginx
+- name: Split servers into two batches
+  set_fact:
+    group1: "{{ ansible_play_hosts_all[0::2] }}"
+    group2: "{{ ansible_play_hosts_all[1::2] }}"
+
+- name: Rolling update group 1
+  include_tasks: rolling_update.yml
+  loop: "{{ group1 }}"
+  loop_control:
+    loop_var: target_host
+
+- name: Check health for group 1
+  uri:
+    url: "http://{{ hostvars[item].ansible_host }}:{{ nginx_port }}/health"
+    method: GET
+    status_code: 200
+  loop: "{{ group1 }}"
+  register: health_results_group1
+
+- name: Fail if any group 1 server is unhealthy
+  fail:
+    msg: "Server {{ item.item }} failed health check."
+  when: item.status != 200
+  loop: "{{ health_results_group1.results }}"
+
+- name: Rolling update group 2
+  include_tasks: rolling_update.yml
+  loop: "{{ group2 }}"
+  loop_control:
+    loop_var: target_host
+
+- name: Check health for group 2
+  uri:
+    url: "http://{{ hostvars[item].ansible_host }}:{{ nginx_port }}/health"
+    method: GET
+    status_code: 200
+  loop: "{{ group2 }}"
+  register: health_results_group2
+
+- name: Fail if any group 2 server is unhealthy
+  fail:
+    msg: "Server {{ item.item }} failed health check."
+  when: item.status != 200
+  loop: "{{ health_results_group2.results }}"
