@@ -6,6 +6,7 @@ pipeline {
         VM_HOST = 'Liron.aws.cts.care'
         VM_USER = 'ubuntu'
     }
+    
     stages {
         stage('Get SSH Private Key from Vault') {
             steps {
@@ -36,7 +37,7 @@ pipeline {
             }
         }
         
-       stage('Install Ansible') {
+        stage('Install Ansible') {
             steps {
                 // Install ansible on Jenkins agent if not already installed
                 sh '''
@@ -48,7 +49,6 @@ pipeline {
             }
         }
 
-        stages {
         stage('Install AWS CLI') {
             steps {
                 script {
@@ -98,7 +98,7 @@ pipeline {
             }
         }
     }
-    
+
     post {
         always {
             // Ensure credentials are always cleaned up, even if the pipeline fails
