@@ -1,9 +1,10 @@
 pipeline {
     agent any
 
-    parameters {
+     parameters {
          string(name: 'CUSTOM_MESSAGE', defaultValue: 'Hello from Jenkins!', description: 'Custom message to include in the HTML')
      }
+
     environment {
         VAULT_TOKEN = credentials('vault-token-secret-text')
         VM_HOST = 'Liron.aws.cts.care'
@@ -28,13 +29,6 @@ pipeline {
                             chmod 600 ~/.ssh_temp/ssh_key.pem
                         '''
                     }
-
-                    // Dynamically get the EC2 instance IP using AWS CLI
-                    sh """
-                        EC2_IP=\$(aws ec2 describe-instances --region {{ aws_region }} --query "Reservations[*].Instances[*].PublicIpAddress" --output text)
-                        echo "EC2 IP: $EC2_IP"
-                    """
-                    
                     
                     echo "Private Key retrieved and stored securely"
                     
@@ -45,10 +39,8 @@ pipeline {
                 }
             }
         }
-
         
-        
-        stage('Install Ansible') {
+       stage('Install Ansible') {
             steps {
                 // Install ansible on Jenkins agent if not already installed
                 sh '''
@@ -56,17 +48,6 @@ pipeline {
                         sudo apt-get update
                         sudo apt-get install -y ansible
                     fi
-                '''
-            }
-        }
-
-        stage('Install Ansible AWS Collection') {
-            steps {
-                sh '''
-                    echo "Installing amazon.aws and community.aws collection..."
-                    ansible-galaxy collection install amazon.aws
-                    ansible-galaxy collection install community.aws
-
                 '''
             }
         }
@@ -108,4 +89,3 @@ pipeline {
         }
     }
 }
-
