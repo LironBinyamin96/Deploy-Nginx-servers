@@ -33,7 +33,7 @@
   notify: Restart Nginx
 
 - name: Deploy custom HTML page
-  copy:
+  template:
     src: templates/index.html.j2
     dest: /var/www/html/index.html
   notify: Restart Nginx
