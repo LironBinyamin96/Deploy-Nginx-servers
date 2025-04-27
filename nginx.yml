@@ -1,5 +1,6 @@
 ---
 - name: Deploy and rolling update Nginx
   hosts: webserver
+  become: yes
   roles:
     - role: nginx
