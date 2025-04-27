@@ -34,6 +34,6 @@
 
 - name: Deploy custom HTML page
   copy:
-    src: files/index.html 
+    src: templates/index.html
     dest: /var/www/html/index.html
   notify: Restart Nginx
