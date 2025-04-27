@@ -68,7 +68,7 @@ pipeline {
                 // Run ansible playbook from Jenkins against the remote VM
                 sh '''
                     export ANSIBLE_HOST_KEY_CHECKING=False
-                    ansible-playbook -i inventory nginx.yml -v --extra-vars "custom_message='${CUSTOM_MESSAGE}'"
+                    ansible-playbook -i inventory nginx.yml -v --extra-vars "CUSTOM_MESSAGE='${hello}'"
                 '''
             }
         }
