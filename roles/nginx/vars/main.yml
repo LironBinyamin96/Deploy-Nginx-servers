@@ -1,2 +1,2 @@
 ---
-CUSTOM_MESSAGE = "Hello World"
+CUSTOM_MESSAGE: "Hello World"
