@@ -36,6 +36,6 @@
 
     - name: Wait for instance to be healthy
       wait_for:
-        timeout: 300
+        timeout: 30
         port: 80
         host: "{{ ansible_host }}"
