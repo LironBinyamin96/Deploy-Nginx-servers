@@ -1,0 +1,41 @@
+---
+- name: Rolling Update Nginx Servers
+  hosts: webserver
+  serial: 50%
+  vars:
+    aws_region: "il-central-1"
+    target_group_arn: "arn:aws:elasticloadbalancing:il-central-1:314525640319:targetgroup/tg-oleg/7760255c09ddd38b
+"
+  tasks:
+    - name: Get instance ID
+      shell: curl http://169.254.169.254/latest/meta-data/instance-id
+      register: instance_id
+
+    - name: Deregister instance from target group
+      amazon.aws.elb_target_group:
+        state: absent
+        region: "{{ aws_region }}"
+        target_group_arn: "{{ target_group_arn }}"
+        targets:
+          - Id: "{{ instance_id.stdout }}"
+
+    - name: Wait for instance to be deregistered
+      pause:
+        seconds: 10
+
+    - name: Include nginx deployment playbook
+      import_playbook: nginx.yml
+
+    - name: Register instance back to target group
+      amazon.aws.elb_target_group:
+        state: present
+        region: "{{ aws_region }}"
+        target_group_arn: "{{ target_group_arn }}"
+        targets:
+          - Id: "{{ instance_id.stdout }}"
+
+    - name: Wait for instance to be healthy
+      wait_for:
+        timeout: 300
+        port: 80
+        host: "{{ ansible_host }}"

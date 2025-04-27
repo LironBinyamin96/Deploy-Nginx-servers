@@ -50,10 +50,14 @@ pipeline {
         
         stage('Prepare Inventory') {
             steps {
-                // Create inventory file for the target VM
+                // Create inventory file for the target VMs dynamically from AWS EC2
                 sh '''
                     echo "[webserver]" > inventory
-                    echo "${VM_HOST} ansible_user=${VM_USER} ansible_ssh_private_key_file=~/.ssh_temp/ssh_key.pem ansible_ssh_common_args='-o StrictHostKeyChecking=no'" >> inventory
+                    INSTANCE_IDS=$(aws ec2 describe-instances --query "Reservations[*].Instances[*].InstanceId" --output text)
+                    for INSTANCE_ID in $INSTANCE_IDS; do
+                        IP=$(aws ec2 describe-instances --instance-ids $INSTANCE_ID --query "Reservations[].Instances[].PublicIpAddress" --output text)
+                        echo "$IP ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh_temp/ssh_key.pem ansible_ssh_common_args='-o StrictHostKeyChecking=no'" >> inventory
+                    done
                     cat inventory
                 '''
             }
@@ -64,7 +68,7 @@ pipeline {
                 // Run ansible playbook from Jenkins against the remote VM
                 sh '''
                     export ANSIBLE_HOST_KEY_CHECKING=False
-                    ansible-playbook -i inventory nginx.yml -v
+                    ansible-playbook -i inventory rolling_update.yml -v
                 '''
             }
         }
