@@ -1,5 +1,9 @@
 pipeline {
     agent any
+
+    parameters {
+         string(name: 'CUSTOM_MESSAGE', defaultValue: 'Hello from Jenkins!', description: 'Custom message to include in the HTML')
+     }
     environment {
         VAULT_TOKEN = credentials('vault-token-secret-text')
         VM_HOST = 'Liron.aws.cts.care'
