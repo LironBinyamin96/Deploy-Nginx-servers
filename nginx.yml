@@ -5,4 +5,4 @@
     target_group_arn: "arn:aws:elasticloadbalancing:il-central-1:314525640319:targetgroup/tg-oleg/7760255c09ddd38b"
     aws_region: "il-central-1"
   roles:
-    - role: rolling-update
+    - role: nginx
